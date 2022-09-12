@@ -122,3 +122,13 @@ tests:
       module: sanity_rgw.py
       name: Swift based tests
       polarion-id: CEPH-11019
+
+  - test:
+      config:
+        script-name: ../s3cmd/test_rate_limit.py
+        config-file-name: ../../s3cmd/configs/test_rate_limit.yaml
+        timeout: 300
+      desc: Test S3 rate limiting
+      module: sanity_rgw.py
+      name: S3 rate limit
+      polarion-id: CEPH-11019
