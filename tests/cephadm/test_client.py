@@ -6,6 +6,7 @@ from ceph.ceph_admin.orch import Orch
 from ceph.parallel import parallel
 from ceph.utils import get_node_by_id
 from utility.log import Log
+from utility import utils
 
 log = Log(__name__)
 
@@ -80,6 +81,11 @@ def add(cls, config: Dict) -> None:
                     node.exec_command(
                         cmd=f"yum install -y --nogpgcheck {pkg}", sudo=True
                     )
+            if config.get("git_clone", False):
+                log.info("perform cloning operation")
+                rgw_ceph_object = cls.cluster.get_ceph_object("rgw")
+                rgw_node = rgw_ceph_object.node
+                utils.perform_env_setup(config, rgw_node, cls.cluster)
 
             out, _ = node.exec_command(cmd="ls -ltrh /etc/ceph/", sudo=True)
             log.info(out)

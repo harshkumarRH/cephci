@@ -1424,6 +1424,46 @@ def clone_the_repo(config, node, path_to_clone):
     git_clone_cmd = f"sudo git clone {repo_url} -b {branch}"
     node.exec_command(cmd=f"cd {path_to_clone} ; {git_clone_cmd}")
 
+def perform_env_setup(config, node, ceph_cluster):
+    config["git-url"] = config.get(
+        "git-url", "https://github.com/red-hat-storage/ceph-qe-scripts.git"
+    )
+    config["test_folder"] = config.get("test_folder", "rgw-tests")
+    test_folder_path = f"~/{config['test_folder']}"
+    pip_cmd = "venv/bin/pip"
+    node.exec_command(cmd=f'sudo rm -rf {config["test_folder"]}')
+    node.exec_command(cmd=f"sudo mkdir {config['test_folder']}")
+    clone_the_repo(config, node, test_folder_path)
+
+    if ceph_cluster.rhcs_version.version[0] > 4:
+        setup_cluster_access(ceph_cluster, node)
+        node.exec_command(
+            sudo=True, cmd="yum install -y ceph-common --nogpgcheck", check_ec=False
+        )
+
+    if ceph_cluster.rhcs_version.version[0] in [3, 4]:
+        if ceph_cluster.containerized:
+            # install ceph-common on the host hosting the container
+            node.exec_command(
+                sudo=True,
+                cmd="yum install -y ceph-common --nogpgcheck",
+                check_ec=False,
+            )
+
+    out, err = node.exec_command(cmd="ls -l venv", check_ec=False)
+
+    if not out:
+        node.exec_command(
+            cmd="yum install python3 -y --nogpgcheck", check_ec=False, sudo=True
+        )
+        node.exec_command(cmd="python3 -m venv venv")
+        node.exec_command(cmd=f"{pip_cmd} install --upgrade pip")
+
+        node.exec_command(
+            cmd=f"{pip_cmd} install "
+                + f"-r {config['test_folder']}/ceph-qe-scripts/rgw/requirements.txt"
+        )
+
 
 def run_fio(**kw):
     """Run IO using fio tool on given target.
