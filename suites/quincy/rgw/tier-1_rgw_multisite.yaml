@@ -29,7 +29,6 @@ tests:
                     registry-url: registry.redhat.io
                     mon-ip: node1
                     orphan-initial-daemons: true
-                    skip-dashboard: true
               - config:
                   command: add_hosts
                   service: host
@@ -221,24 +220,3 @@ tests:
       polarion-id: CEPH-83575199
       module: sanity_rgw_multisite.py
       name: create non-tenanted user
-
-  - test:
-      name: Enable the dashboard
-      desc: After skip-dashboard enable the dashboard and validate login
-      module: test_dashboard.py
-      polarion-id: CEPH-83573717
-      clusters:
-        ceph-pri:
-          config:
-            command: enable_dashboard
-              args:
-                username: admin123
-                password: primary@123
-        ceph-sec:
-          config:
-            command: enable_dashboard
-            args:
-              username: admin123
-              password: secondary@123
-      destroy-cluster: false
-      abort-on-fail: true
