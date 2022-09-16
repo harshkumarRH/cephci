@@ -222,7 +222,7 @@ tests:
       module: sanity_rgw_multisite.py
       name: create non-tenanted user
 
-  - -test:
+  - test:
       name: Enable the dashboard
       desc: After skip-dashboard enable the dashboard and validate login
       module: test_dashboard.py
