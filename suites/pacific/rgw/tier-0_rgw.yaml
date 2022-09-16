@@ -83,42 +83,42 @@ tests:
       name: Test M buckets with N objects
       polarion-id: CEPH-9789
 
-  - test:
-      config:
-        script-name: test_Mbuckets_with_Nobjects.py
-        config-file-name: test_Mbuckets_with_Nobjects_delete.yaml
-        timeout: 300
-      desc: test to create "M" no of buckets and "N" no of objects with delete
-      module: sanity_rgw.py
-      name: Test delete using M buckets with N objects
-      polarion-id: CEPH-14237
+#   - test:
+#       config:
+#         script-name: test_Mbuckets_with_Nobjects.py
+#         config-file-name: test_Mbuckets_with_Nobjects_delete.yaml
+#         timeout: 300
+#       desc: test to create "M" no of buckets and "N" no of objects with delete
+#       module: sanity_rgw.py
+#       name: Test delete using M buckets with N objects
+#       polarion-id: CEPH-14237
 
-  - test:
-      config:
-        script-name: test_Mbuckets_with_Nobjects.py
-        config-file-name: test_Mbuckets_with_Nobjects_download.yaml
-        timeout: 300
-      desc: test to create "M" no of buckets and "N" no of objects with download
-      module: sanity_rgw.py
-      name: Test download with M buckets with N objects
-      polarion-id: CEPH-14237
+#   - test:
+#       config:
+#         script-name: test_Mbuckets_with_Nobjects.py
+#         config-file-name: test_Mbuckets_with_Nobjects_download.yaml
+#         timeout: 300
+#       desc: test to create "M" no of buckets and "N" no of objects with download
+#       module: sanity_rgw.py
+#       name: Test download with M buckets with N objects
+#       polarion-id: CEPH-14237
 
-  - test:
-      config:
-        script-name: test_Mbuckets_with_Nobjects.py
-        config-file-name: test_Mbuckets_with_Nobjects_multipart.yaml
-        timeout: 300
-      desc: test to create "M" no of buckets and "N" no of objects with multipart upload
-      module: sanity_rgw.py
-      name: Test multipart upload of M buckets with N objects
-      polarion-id: CEPH-9801
+#   - test:
+#       config:
+#         script-name: test_Mbuckets_with_Nobjects.py
+#         config-file-name: test_Mbuckets_with_Nobjects_multipart.yaml
+#         timeout: 300
+#       desc: test to create "M" no of buckets and "N" no of objects with multipart upload
+#       module: sanity_rgw.py
+#       name: Test multipart upload of M buckets with N objects
+#       polarion-id: CEPH-9801
 
-  - test:
-      config:
-        script-name: test_swift_basic_ops.py
-        config-file-name: test_swift_basic_ops.yaml
-        timeout: 300
-      desc: Test object operations with swift
-      module: sanity_rgw.py
-      name: Swift based tests
-      polarion-id: CEPH-11019
+#   - test:
+#       config:
+#         script-name: test_swift_basic_ops.py
+#         config-file-name: test_swift_basic_ops.yaml
+#         timeout: 300
+#       desc: Test object operations with swift
+#       module: sanity_rgw.py
+#       name: Swift based tests
+#       polarion-id: CEPH-11019
