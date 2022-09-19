@@ -353,7 +353,7 @@ def create_s3_conf(
     rgw_node = cluster.get_nodes(role="rgw")[0]
     client_node = cluster.get_nodes(role="client")[0]
 
-    if build.startswith("5"):
+    if build.startswith(("5", "6")):
         rgw_node = client_node
 
     create_s3_user(node=rgw_node, user_prefix="main", data=data)
