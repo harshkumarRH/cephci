@@ -21,7 +21,7 @@ node('ceph-qe-ci || rhel-8-medium') {
             checkout(
                 scm: [
                     $class: 'GitSCM',
-                    branches: [[name: 'origin/master']],
+                    branches: [[name: 'refs/remotes/origin/upstream_pipeline']],
                     extensions: [[
                         $class: 'CleanBeforeCheckout',
                         deleteUntrackedNestedRepositories: true
@@ -67,14 +67,14 @@ node('ceph-qe-ci || rhel-8-medium') {
                                     "ceph_version": cephVersion,
                                     "repository": yamlData[upstreamVersion]["image"],
                                     "upstreamVersion": upstreamVersion]
-            def status = "STABLE"
-            if ( "FAIL" in sharedLib.fetchStageStatus(testResults) ) {
-                currentBuild.result = "FAILURE"
-                status = "UNSTABLE"
-            }
-            sharedLib.sendEmail(buildType, testResults, upstreamArtifact)
-            def msg = "Upstream test report status of ceph version:${cephVersion}-${upstreamVersion} is ${status} .Log:${env.BUILD_URL}"
-            googlechatnotification(url: "id:rhcephCIGChatRoom", message: msg)
+//             def status = "STABLE"
+//             if ( "FAIL" in sharedLib.fetchStageStatus(testResults) ) {
+//                 currentBuild.result = "FAILURE"
+//                 status = "UNSTABLE"
+//             }
+//             sharedLib.sendEmail(buildType, testResults, upstreamArtifact)
+//             def msg = "Upstream test report status of ceph version:${cephVersion}-${upstreamVersion} is ${status} .Log:${env.BUILD_URL}"
+//             googlechatnotification(url: "id:rhcephCIGChatRoom", message: msg)
         }
 
         stage('Post Build Action') {
