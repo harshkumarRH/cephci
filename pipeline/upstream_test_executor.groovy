@@ -6,9 +6,12 @@ def sharedLib
 def testStages = [:]
 def testResults = [:]
 def upstreamVersion = "${params.Upstream_Version}"
+def currentStage = "${params.Current_Stage}"
 def buildType = "upstream"
 def yamlData
 def cephVersion
+def tags = "${buildType},${currentStage}"
+def overrides = [build:buildType,"upstream-build":upstreamVersion]
 
 // Pipeline script entry point
 node('ceph-qe-ci || rhel-8-medium') {
@@ -44,18 +47,16 @@ node('ceph-qe-ci || rhel-8-medium') {
         }
 
         stage('Fetch Test-suites for Execution') {
-            def tags = "${buildType},stage-1"
-            def overrides = [build:buildType,"upstream-build":upstreamVersion]
             fetchStages = sharedLib.fetchStages(tags, overrides, testResults, null, null, upstreamVersion)
             testStages = fetchStages["testStages"]
             if ( testStages.isEmpty() ) {
-                currentBuild.result = "FAILURE"
-                error "No test suites were found for execution."
+                currentBuild.result = "ABORTED"
+                error "Test suites were not found for execution."
             }
             print("Stages fetched: ${fetchStages}")
             yamlData = readYaml file: "/ceph/cephci-jenkins/latest-rhceph-container-info/${buildType}.yaml"
             cephVersion = yamlData[upstreamVersion]["ceph-version"]
-            currentBuild.description = "${buildType} - ${upstreamVersion} - ${cephVersion}"
+            currentBuild.description = "${upstreamVersion} - ${currentStage} - ${cephVersion}"
         }
 
         parallel testStages
@@ -74,6 +75,21 @@ node('ceph-qe-ci || rhel-8-medium') {
             sharedLib.sendEmail(buildType, testResults, upstreamArtifact)
             def msg = "Upstream test report status of ceph version:${cephVersion}-${upstreamVersion} is ${status} .Log:${env.BUILD_URL}"
             googlechatnotification(url: "id:rhcephCIGChatRoom", message: msg)
+        }
+
+        stage('Post Build Action') {
+            nextStage = "stage-" + ((currentStage.split('-')[-1] as int) + 1)
+            tags = "${buildType},${nextStage}"
+            fetchStages = sharedLib.fetchStages(tags, overrides, testResults, null, null, upstreamVersion)
+            testStages = fetchStages["testStages"]
+            if ( !testStages.isEmpty() ) {
+                build ([
+                    wait: false,
+                    job: "rhceph-upstream-test-executor",
+                    parameters: [string(name: 'Upstream_Version', value: upstreamVersion.toString()),
+                                string(name: 'Current_Stage', value: nextStage.toString())]
+                ])
+            }
         }
     } catch(Exception err) {
         // notify about failure
