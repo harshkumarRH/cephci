@@ -6,7 +6,7 @@
 # cluster whereas the sec zone is part of the sec datacenter (cluster).
 
 # The deployment is evaluated by running IOs across the environments.
-# conf : conf/pacific/rgw/rgw_multisite.yaml
+# conf : conf/quincy/rgw/rgw_multisite.yaml
 tests:
 
   - test:
@@ -115,6 +115,68 @@ tests:
       clusters:
         ceph-pri:
           config:
+            verify_cluster_health: true
+            steps:
+              - config:
+                  command: apply_spec
+                  service: orch
+                  validate-spec-services: true
+                  specs:
+                    - service_type: prometheus
+                      placement:
+                        count: 1
+                        nodes:
+                          - node1
+                    - service_type: grafana
+                      placement:
+                        nodes:
+                          - node1
+                    - service_type: alertmanager
+                      placement:
+                        count: 1
+                    - service_type: node-exporter
+                      placement:
+                        host_pattern: "*"
+                    - service_type: crash
+                      placement:
+                        host_pattern: "*"
+        ceph-sec:
+          config:
+            verify_cluster_health: true
+            steps:
+              - config:
+                  command: apply_spec
+                  service: orch
+                  validate-spec-services: true
+                  specs:
+                    - service_type: prometheus
+                      placement:
+                        count: 1
+                        nodes:
+                          - node1
+                    - service_type: grafana
+                      placement:
+                        nodes:
+                          - node1
+                    - service_type: alertmanager
+                      placement:
+                        count: 1
+                    - service_type: node-exporter
+                      placement:
+                        host_pattern: "*"
+                    - service_type: crash
+                      placement:
+                        host_pattern: "*"
+      name: Monitoring Service(s) deployment
+      desc: Add monitoring services using spec file.
+      module: test_cephadm.py
+      polarion-id: CEPH-83574727
+
+  - test:
+      abort-on-fail: true
+      clusters:
+        ceph-pri:
+          config:
             command: add
             id: client.1
             node: node6
@@ -204,7 +266,6 @@ tests:
       polarion-id: CEPH-83575227
       module: exec.py
       name: get shared realm info on secondary
-  # Test work flow
 
   - test:
       clusters:
