@@ -199,7 +199,7 @@ def execute_teardown(cluster: Ceph, build: str) -> None:
 
 def clone_s3_tests(node: CephNode, branch="ceph-luminous") -> None:
     """Clone the S3 repository on the given node."""
-    repo_url = "https://github.com/ceph/s3-tests.git"
+    repo_url = "https://github.com/TejasC88/s3-tests.git"
     node.exec_command(cmd="if test -d s3-tests; then sudo rm -r s3-tests; fi")
     node.exec_command(cmd=f"git clone -b {branch} {repo_url}")
 
