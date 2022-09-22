@@ -208,6 +208,16 @@ tests:
         commands:
           - "ceph versions"
 
+  - test:
+#       desc: Retrieve the versions of the cluster post upgrade
+#       polarion-id: CEPH-83575200
+      module: exec.py
+      name: post upgrade gather version
+      config:
+        node: node5
+        commands:
+          - "yum install -y ceph-common --nogpgcheck"
+
 # Post upgrade tests
 # basic versioning tests
   - test:
