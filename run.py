@@ -158,6 +158,7 @@ Options:
 """
 log = Log()
 test_names = []
+skip_version_compare = False
 
 
 @retry(LibcloudError, tries=5, delay=15)
@@ -765,8 +766,10 @@ def run(args):
 
     # Initialize test return code
     rc = 0
+    parallel_tc_details = []
 
-    for test in tests:
+    def run_individual_test(test, ceph_cluster_dict, clients, _rhcs_version, tcs, run_parallel=False):
+        global skip_version_compare
         test = test.get("test")
         tc = fetch_test_details(test)
         test_file = tc["file"]
@@ -782,6 +785,12 @@ def run(args):
 
         if tc.get("log-link"):
             print("Test logfile location: {log_url}".format(log_url=tc["log-link"]))
+
+        if run_parallel:
+            for parallel_test in test.get("parallel"):
+                p_test = parallel_test.get("test")
+                parallel_tc = fetch_test_details(p_test)
+                parallel_tc_details.append(parallel_tc)
 
         log.info(f"Running test {test_file}")
         start = datetime.datetime.now()
@@ -878,6 +887,9 @@ def run(args):
                     test_data=ceph_test_data,
                     ceph_cluster_dict=ceph_cluster_dict,
                     clients=clients,
+                    run_dir=run_dir,
+                    parallel_tc_details=parallel_tc_details,
+                    tcs=tcs,
                 )
             except BaseException as be:  # noqa
                 log.exception(be)
@@ -893,51 +905,60 @@ def run(args):
         elapsed = datetime.datetime.now() - start
         tc["duration"] = elapsed
 
-        # Write to report portal
-        if post_to_report_portal:
-            rp_logger.finish_test_item(status="PASSED" if rc == 0 else "FAILED")
+        if not run_parallel:
+            # Write to report portal
+            if post_to_report_portal:
+                rp_logger.finish_test_item(status="PASSED" if rc == 0 else "FAILED")
 
-        if rc == 0:
-            tc["status"] = "Pass"
-            msg = "Test {} passed".format(test_mod)
-            log.info(msg)
-            print(msg)
+            if rc == 0:
+                tc["status"] = "Pass"
+                msg = "Test {} passed".format(test_mod)
+                log.info(msg)
+                print(msg)
 
-            if post_results:
-                post_to_polarion(tc=tc)
-        else:
-            tc["status"] = "Failed"
-            msg = "Test {} failed".format(test_mod)
-            log.info(msg)
-            print(msg)
-            jenkins_rc = 1
+                if post_results:
+                    post_to_polarion(tc=tc)
+            else:
+                tc["status"] = "Failed"
+                msg = "Test {} failed".format(test_mod)
+                log.info(msg)
+                print(msg)
+                jenkins_rc = 1
 
-            if post_results:
-                post_to_polarion(tc=tc)
+                if post_results:
+                    post_to_polarion(tc=tc)
 
-            if test.get("abort-on-fail", False):
-                log.info("Aborting on test failure")
-                tcs.append(tc)
-                break
+                if test.get("abort-on-fail", False):
+                    log.info("Aborting on test failure")
+                    tcs.append(tc)
+                    raise StopIteration
 
-        if test.get("destroy-cluster") is True:
-            if cloud_type == "openstack":
-                cleanup_ceph_nodes(osp_cred, instances_name)
-            elif cloud_type == "ibmc":
-                cleanup_ibmc_ceph_nodes(osp_cred, instances_name)
+            if test.get("destroy-cluster") is True:
+                if cloud_type == "openstack":
+                    cleanup_ceph_nodes(osp_cred, instances_name)
+                elif cloud_type == "ibmc":
+                    cleanup_ibmc_ceph_nodes(osp_cred, instances_name)
 
-        if test.get("recreate-cluster") is True:
-            ceph_cluster_dict, clients = create_nodes(
-                conf,
-                inventory,
-                osp_cred,
-                run_id,
-                cloud_type,
-                service,
-                instances_name,
-                enable_eus=enable_eus,
-            )
-        tcs.append(tc)
+            if test.get("recreate-cluster") is True:
+                ceph_cluster_dict, clients = create_nodes(
+                    conf,
+                    inventory,
+                    osp_cred,
+                    run_id,
+                    cloud_type,
+                    service,
+                    instances_name,
+                    enable_eus=enable_eus,
+                )
+            tcs.append(tc)
+
+    for test in tests:
+        run_parallel = True if test.get("test").get("parallel") else False
+        try:
+            run_individual_test(test, ceph_cluster_dict, clients, _rhcs_version, tcs, run_parallel)
+        except Exception as e:
+            log.exception(e)
+            print("Execution aborted due to failure")
 
     url_base = (
         magna_url + run_dir.split("/")[-1]
