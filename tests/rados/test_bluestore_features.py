@@ -117,7 +117,7 @@ def run(ceph_cluster, **kw):
         scrub_object.set_osd_configuration("osd_scrub_end_week_day", 0)
         log.info("The osd_scrub_end_week_day is set to 0")
 
-    # Stroring the initial memory
+    # Storing the initial memory
     for osd in new_osd_list:
         memory = get_mempool_bytes(rados_object, osd)
         osd_mem_pool[osd] = memory

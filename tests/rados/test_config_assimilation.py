@@ -34,6 +34,7 @@ def run(ceph_cluster, **kw) -> int:
     client_node = ceph_cluster.get_nodes(role="client")[0]
 
     log.info("Testing configuration assimilation from ceph.conf files")
+    test_config = config.get("Verify_config_parameters")
 
     try:
         with open(cluster_conf_path, "r") as fd:
@@ -44,9 +45,7 @@ def run(ceph_cluster, **kw) -> int:
         )
 
         # Adding the configurations into the conf file.
-        cmd = f"""cat <<EOF >> /etc/ceph/ceph.conf
-    {cluster_conf_file}
-    EOF"""
+        cmd = f"echo '{cluster_conf_file}' >> /etc/ceph/ceph.conf"
         client_node.exec_command(cmd=cmd, sudo=True)
         log.debug("Completed adding the configurations into the ceph.conf file ")
 
@@ -60,7 +59,6 @@ def run(ceph_cluster, **kw) -> int:
         client_node.exec_command(cmd=cmd, sudo=True)
 
         # Verifying the configs set via the CLI in the mon config database.
-        test_config = config.get("Verify_config_parameters")
         for conf in test_config["configurations"]:
             for entry in conf.values():
                 if not mon_obj.verify_set_config(**entry):
