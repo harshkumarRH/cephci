@@ -26,7 +26,7 @@ def run(ceph_cluster, **kw):
     2. Capture ceph monitor dump before modifying weights
     3. Modify the mon weight for the active mon daemon
     4. Check the modified weight is showing up correctly in ceph mon dump
-    5. Restart MGR orch service
+    5. Restart MGR orch services
     6. All the MGR daemons should start without fail, no crashes should be reported
     """
     log.info(run.__doc__)
