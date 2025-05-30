@@ -208,9 +208,12 @@ class BootstrapMixin:
         # available only for RH network.
         _rhcs_version = args.pop("rhcs-version", None)
         _rhcs_release = args.pop("release", None)
+        _ibm_build = self.config.get("ibm_build", None)
         if _rhcs_release and _rhcs_version:
             _platform = "-".join(rhbuild.split("-")[1:])
-            _details = fetch_build_artifacts(_rhcs_release, _rhcs_version, _platform)
+            _details = fetch_build_artifacts(
+                _rhcs_release, _rhcs_version, _platform, ibm_build=_ibm_build
+            )
 
             # The cluster object is configured so that the values are persistent till
             # an upgrade occurs. This enables us to execute the test in the right
