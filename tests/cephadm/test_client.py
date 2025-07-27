@@ -175,6 +175,7 @@ def add(cls, config: Dict) -> None:
 
             # Install ceph-common
             if config.get("install_packages"):
+                workaround_openssl_issue(_node, config)
                 for pkg in config.get("install_packages"):
                     _node.exec_command(
                         cmd=f"yum install -y --nogpgcheck {pkg}", sudo=True
@@ -255,6 +256,34 @@ def remove(cls, config: Dict) -> None:
 MAP_ = {"add": add, "remove": remove}
 
 
+# TODO: remove this work around once the openssl issue resolved here
+# https://tracker.ceph.com/issues/71250
+def workaround_openssl_issue(node, cfg: Dict) -> None:
+    """
+    Workaround for the openssl issue in RHEL 9.0
+    This is a temporary fix to install openssl-libs package
+    for tentacle upstream build.
+    Args:
+        node: client node object
+        cfg: test config dict
+    """
+    if cfg.get("custom-config"):
+        patch_openssl = None
+        for _config in cfg["custom-config"]:
+            if "patch_openssl" in _config:
+                patch_openssl = bool(_config.split("=")[1])
+                break
+        if patch_openssl:
+            openssl_url = (
+                "https://mirror.stream.centos.org/9-stream/BaseOS/"
+                "x86_64/os/Packages/openssl-libs-3.5.1-1.el9.x86_64.rpm"
+            )
+            node.exec_command(cmd=f"wget {openssl_url}", sudo=True)
+            node.exec_command(
+                cmd="rpm --force -i openssl-libs-3.5.1-1.el9.x86_64.rpm", sudo=True
+            )
+
+
 def run(ceph_cluster, **kw):
     """
     test module to manage client operations
@@ -277,6 +306,8 @@ def run(ceph_cluster, **kw):
           mgr: "allow *"
     """
     config = kw["config"]
+    if kw.get("test_data"):
+        config.update(kw["test_data"])
 
     build = config.get("build", config.get("rhbuild"))
     ceph_cluster.rhcs_version = build
