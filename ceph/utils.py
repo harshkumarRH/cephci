@@ -1397,3 +1397,27 @@ def is_client(ceph_node):
     Return True if client node else False
     """
     return len(ceph_node.role.role_list) == 1 and "client" in ceph_node.role.role_list
+
+
+def enable_coredump(node):
+    """
+    Method to enable coredump collection
+    Refer: https://bugzilla.redhat.com/show_bug.cgi?id=2170213#c1
+    Args:
+        node: ceph node object
+    Returns:
+        None
+    """
+    log.info("Enabling coredump collection on %s" % node.hostname)
+    sys_cmds = [
+        "echo 'fs.suid_dumpable = 2' >> /etc/sysctl.conf",
+        "sysctl -p",
+        "echo 'DefaultLimitCORE=infinity' >> /etc/systemd/system.conf",
+    ]
+
+    for _cmd in sys_cmds:
+        out, err = node.exec_command(cmd=_cmd, sudo=True)
+        log.info("Out: %s \n Err: %s" % (out, err))
+
+    # reboot the node
+    node.exec_command(cmd="reboot", sudo=True, check_ec=False)
