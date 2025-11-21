@@ -185,6 +185,7 @@ tests:
       module: smb_deployment_imperative_method
       polarion-id: CEPH-83593843
       config:
+<<<<<<< HEAD
         cephfs_volume: cephfs
         smb_subvolume_group: smb
         smb_subvolumes: [sv1, sv2]
@@ -195,3 +196,15 @@ tests:
         smb_user_password: passwd
         smb_shares: [share1, share2]
         path: "/"
+=======
+        nfs_version: 4.2
+        clients: 1
+        operation: mv_file_overwrite
+
+  - test:
+      name: Scrub Investigate
+      module: test_scrub_investigate.py
+      desc: Deploy cluster to test scrubbing
+      config:
+        sleep-duration: 7200
+>>>>>>> 72fbd1637 (Investigate BVT Coredump)
