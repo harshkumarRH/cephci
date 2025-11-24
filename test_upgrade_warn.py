@@ -50,6 +50,7 @@ def run(ceph_cluster, **kw):
                     services: Comma-separated service names to upgrade (e.g., "mon,mgr") (optional)
                 base_cmd_args: Base command arguments (e.g., verbose: true)
                 timeout: Timeout for upgrade completion in seconds (default: 3600)
+                ibm_build: Boolean flag for IBM build (default: False)
                 verify_warning: Check if the health warnings during the upgrade is generated & removed post upgrade
                 verify_older_version_warn: Check if DAEMON_OLD_VERSION warning is generated
                 verify_daemons: Check for daemon existence on cluster post upgrade
@@ -116,10 +117,9 @@ def run(ceph_cluster, **kw):
         # available only for RH network.
         _rhcs_version = args.get("rhcs-version", None)
         _rhcs_release = args.get("release", None)
-        product = args.get("product", "redhat")
-        _platform = args.get("platform", config["platform"])
         _custom_image = args.get("custom_image", None)
         _custom_repo = args.get("custom_repo", None)
+        _ibm_build = config.get("ibm_build", False)
         _rpm_version = None
         if _rhcs_release and _rhcs_version:
             curr_ver, _ = cephadm_obj.shell(args=["ceph version | awk '{print $3}'"])
@@ -127,12 +127,11 @@ def run(ceph_cluster, **kw):
                 "Upgrading the cluster from ceph version %s to %s-%s "
                 % (curr_ver, _rhcs_version, _rhcs_release)
             )
-            ctm: CephTestManifest = CephTestManifest(
-                product=product,
-                release=_rhcs_version,
-                build_type=_rhcs_release,
-                platform=_platform,
-            )
+            product: str = args.get("--product", "redhat")
+            release: str = args.get("--release", rhbuild)
+            _platform: str = args["--platform"]
+            build: str = args.get("--build", "released")
+            ctm: CephTestManifest = CephTestManifest(product, release, build, _platform)
             _base_url = ctm.repository
             _registry = ctm.ceph_image_dtr
             _image_name = ctm.ceph_image_path

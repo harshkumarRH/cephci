@@ -109,3 +109,4 @@ instance:
       - dnf install -yq lvm2 chrony yum-utils podman net-snmp-utils net-snmp python3-devel wget
       - dnf update -y
       - touch /ceph-qa-ready
+      - jq '.transports.docker["registry.redhat.io"] = [ { "type": "insecureAcceptAnything" } ]' /etc/containers/policy.json > /tmp/policy.json && mv -f /tmp/policy.json /etc/containers/policy.json

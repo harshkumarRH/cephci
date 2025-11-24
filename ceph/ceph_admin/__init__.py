@@ -252,7 +252,6 @@ class CephAdmin(BootstrapMixin, ShellMixin, RegistryLoginMixin):
                     upd_cmd = f"{upd_cmd}-{kwargs['rpm_version']}"
 
                 node.exec_command(sudo=True, cmd=upd_cmd)
-                node.exec_command(cmd="rpm -qa | grep ceph")
 
         else:
             for node in nodes:
