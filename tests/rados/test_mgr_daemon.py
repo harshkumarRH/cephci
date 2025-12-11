@@ -3,7 +3,6 @@ Module to test MGR functionalities
 
 """
 
-import random
 import time
 
 from ceph.ceph_admin import CephAdmin
@@ -132,7 +131,7 @@ def run(ceph_cluster, **kw):
         f" Scenario-3: The mgr daemons before starting tests are-{mgr_daemons_before_tests} "
     )
     # Adding a new MGR
-    new_node = random.choice(ceph_cluster.get_nodes(ignore="mgr"))
+    new_node = fetch_node_without_mgr(ceph_cluster)
     if new_node is None:
         log.error("Scenario:3-No new node to add the MGR daemon")
         return 1
@@ -174,7 +173,7 @@ def run(ceph_cluster, **kw):
     mgr_nodes = rados_obj.get_daemon_list_fromCluster(daemon_type="mgr")
     log.info(f" Scenario-4- The mgr daemons before starting the test-{mgr_nodes}")
     mgr_count = len(mgr_nodes)
-    new_node = random.choice(ceph_cluster.get_nodes(ignore="mgr"))
+    new_node = fetch_node_without_mgr(ceph_cluster)
     mgr_nodes.append(new_node.hostname)
     log.info(f"The mgr count before scaleup is - {mgr_count}")
 
@@ -198,3 +197,19 @@ def run(ceph_cluster, **kw):
         "End of Scenario 4: Verification of  a scenario of scaleup and down of mgr daemon passed"
     )
     return 0
+
+
+def fetch_node_without_mgr(cluster):
+    """
+    Method to get a node that is not an MGR
+    Args:
+        cluster: ceph cluster object
+    return: node that is not a mgr node
+    """
+    # Get any random node for scale-up the mgr daemons
+    mgr_nodes = cluster.get_nodes(role="mgr")
+    cluster_nodes = cluster.get_nodes(ignore="client")
+    # Get a new node
+    for node in cluster_nodes:
+        if node not in mgr_nodes:
+            return node
