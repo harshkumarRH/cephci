@@ -3,6 +3,7 @@ import json
 import re
 import time
 
+from ceph.ceph import CommandFailed
 from ceph.parallel import parallel
 from ceph.utils import config_ntp, enable_coredump, is_client, update_ca_cert
 from ceph.waiter import WaitUntil
@@ -205,9 +206,20 @@ def install_prereq(
         if distro_ver.startswith("7"):
             rpm_all_packages = " ".join(rpm_packages.get("7"))
 
-        ceph.exec_command(
-            cmd=f"sudo yum install -y {rpm_all_packages}", long_running=True
-        )
+        try:
+            ceph.exec_command(
+                cmd=f"sudo yum install -y {rpm_all_packages}",
+                long_running=True,
+                check_ec=True,
+            )
+        except CommandFailed:
+            log.warning(
+                "Combined Package installation failed, reverting to individual installation"
+            )
+            for rpm_pkg in rpm_all_packages.split():
+                ceph.exec_command(
+                    cmd=f"sudo yum install -y {rpm_pkg}", long_running=True
+                )
 
         # Restarting the node for qdisc filter to be loaded. This is required for
         # RHEL-8

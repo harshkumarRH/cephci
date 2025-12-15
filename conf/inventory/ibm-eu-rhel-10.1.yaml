@@ -106,6 +106,6 @@ instance:
       - sed -i 's/gpgcheck=1/gpgcheck=0/' /etc/yum.conf
       - sed -i 's/gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
       - dnf clean all
-      - dnf install -yq lvm2 chrony yum-utils podman net-snmp-utils net-snmp python3-devel wget
+      - dnf install -yq lvm2 chrony yum-utils podman net-snmp-utils net-snmp python3-devel wget git-core
       - dnf update -y
       - touch /ceph-qa-ready
