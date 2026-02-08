@@ -971,6 +971,7 @@ def run(ceph_cluster, **kw):
         # Check for inconsistent PGs across all pools and repair if found
         log.info("Checking for inconsistent PGs across all pools...")
         all_pools = rados_obj.list_pools()
+        ceph_df_out = client_node.exec_command(cmd="ceph df", sudo=True)
         inconsistent_pgs_found = []
         for check_pool in all_pools:
             try:
@@ -985,6 +986,7 @@ def run(ceph_cluster, **kw):
                 log.debug(f"Error checking pool {check_pool}: {e}")
 
         if inconsistent_pgs_found:
+            config["cleanup_pools"] = False
             log.debug(
                 f"Total inconsistent PGs found: {len(inconsistent_pgs_found)}. "
                 f"Inconsistent PGs: {inconsistent_pgs_found}. "
@@ -1007,6 +1009,11 @@ def run(ceph_cluster, **kw):
                 except Exception as e:
                     log.error(f"Failed to repair PG {pg_id}: {e}")
             time.sleep(30)
+            raise Exception(
+                f"Inconsistent PGs found, aborting test execution.."
+                f"Inconsistent PGs: {inconsistent_pgs_found}"
+                f"ceph df output: {ceph_df_out}"
+            )
         else:
             log.info("No inconsistent PGs found across all pools")
 
