@@ -30,6 +30,7 @@ tests:
                 orphan-initial-daemons: true
                 registry-url: registry.redhat.io
                 allow-fqdn-hostname: true
+                skip-monitoring-stack: true
           - config:
               command: add_hosts
               service: host
@@ -94,7 +95,10 @@ tests:
       config:
         command: add
         id: client.1                      # client Id (<type>.<Id>)
-        node: node7                       # client node
+        nodes: # client node
+          - node7:
+              release: 7.1
+              tag: z1
         install_packages:
           - ceph-common
         copy_admin_keyring: true          # Copy admin keyring to node
