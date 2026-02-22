@@ -141,4 +141,4 @@ tests:
       module: test_scrub_investigate.py
       desc: Cluster idle - do nothing
       config:
-        sleep-duration: 10800            
+        sleep-duration: 100
