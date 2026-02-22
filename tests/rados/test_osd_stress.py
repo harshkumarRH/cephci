@@ -98,7 +98,7 @@ def run(ceph_cluster, **kw):
             log.info("RADOS bench IO completed on pool" + _pool)
 
             # start background rados bench IOs on the pool
-            for obj_size in ["4KB", "16KB", "32KB", "256KB"]:
+            for obj_size in ["4KB", "16KB", "32KB"]:
                 rados_obj.bench_write(
                     pool_name=_pool,
                     byte_size=obj_size,
@@ -113,6 +113,7 @@ def run(ceph_cluster, **kw):
         while end_time > datetime.datetime.now():
             # proceed to write OMAP data on the pools
             for omap_pool in omap_pools:
+                time.sleep(120)
                 omap_cfg = config["omap_config"]
                 omap_cfg["num_keys_obj"] = random.randint(100, omap_cfg["num_keys_obj"])
                 if not pool_obj.fill_omap_entries(pool_name=omap_pool, **omap_cfg):
