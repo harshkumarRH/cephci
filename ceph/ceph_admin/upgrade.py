@@ -5,6 +5,8 @@ from json import JSONDecodeError, loads
 from time import sleep
 from typing import Dict
 
+from looseversion import LooseVersion
+
 from ceph.ceph import CommandFailed
 from ceph.waiter import WaitUntil
 from utility.log import Log
@@ -70,6 +72,13 @@ class UpgradeMixin:
         # Add optional services argument
         if args and "services" in args:
             cmd.append(f"--services {args['services']}")
+
+        # IBM Storage Ceph 9.1 and greater would require license acceptance
+        # There is '--automatically-accept-license' option
+        if config.get("product") == "ibm" and LooseVersion(
+            str(config.get("release"))
+        ) >= LooseVersion("9.1"):
+            cmd.append("--automatically-accept-license")
 
         return self.shell(args=cmd)
 
