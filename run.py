@@ -623,6 +623,8 @@ def run(args):
     ibm_build = False
     # disable coredump collection by default
     collect_coredump = False
+    # disable cluster log collection by default
+    collect_ceph_logs = False
 
     # Custom or override configurations
     kernel_repo = args.get("--kernel-repo")
