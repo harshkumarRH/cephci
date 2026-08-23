@@ -653,7 +653,7 @@ def run(ceph_cluster, **kw):
                     node_ls_op = rados_obj.run_ceph_command(
                         cmd="ceph node ls osd", client_exec=True
                     )
-                    log.debug("ceph node ls osd output: ", node_ls_op)
+                    log.debug("ceph node ls osd output: %s", node_ls_op)
                     nodels_osd_list = [
                         item for entry in node_ls_op.values() for item in entry
                     ]
@@ -688,7 +688,7 @@ def run(ceph_cluster, **kw):
                     node_ls_op = rados_obj.run_ceph_command(
                         cmd="ceph node ls osd", client_exec=True
                     )
-                    log.debug("ceph node ls osd output: ", node_ls_op)
+                    log.debug("ceph node ls osd output: %s", node_ls_op)
 
                     nodels_osd_list = [
                         item for entry in node_ls_op.values() for item in entry
