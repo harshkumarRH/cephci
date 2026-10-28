@@ -10,14 +10,18 @@ before/after upgrade key verify (service aes→aes256k; client.* must not
 auto-rotate) then remediation.
 
 Reusable from upgrade thrashing and other suites via remediate_cephx_auth_warnings().
+
 """
 
+import base64
+import json
 import re
 import time
 from datetime import datetime, timezone
 
 from ceph.ceph_admin.orch import Orch
 from ceph.parallel import parallel
+from cli.ceph.ceph import Ceph
 from cli.cephadm.cephadm import CephAdm
 from utility.log import Log
 
@@ -32,6 +36,8 @@ AUTH_TARGET_CHECKS = (
 
 _SECURE = "aes256k"
 _SERVICE = ("mon.", "mgr.", "osd.", "mds.")
+# CryptoKey type byte in the auth-ls key blob (== dump-keys auth.key.type).
+_KEY_TYPE_BY_BYTE = {1: "aes", 2: "aes256k"}  # 1→AQ…, 2→Ag…
 
 DEFAULT_CEPHX_CONFIG = {
     "enabled": True,
@@ -81,8 +87,20 @@ def cephx_failure_reasons(cephx_result):
     ]
 
 
+def _key_type_from_encoded(key):
+    """Infer cipher type_str from an ``auth ls`` key (no dump-keys)."""
+    try:
+        raw = base64.b64decode(key or "")
+    except Exception:
+        return None
+    return _KEY_TYPE_BY_BYTE.get(raw[0]) if raw else None
+
+
 def snapshot_cephx_keys(rados_obj):
-    """Return {entity: {key, key_type}} from auth ls (+ dump-keys types when present)."""
+    """Return {entity: {key, key_type}} from ``ceph auth ls`` (z0+ compatible).
+
+    Type is the first byte of the decoded key blob (1=aes, 2=aes256k).
+    """
     auth_ls = rados_obj.run_ceph_command(cmd="ceph auth ls") or {}
     entries = (
         auth_ls.get("auth_dump")
@@ -90,27 +108,19 @@ def snapshot_cephx_keys(rados_obj):
         else auth_ls if isinstance(auth_ls, list) else []
     ) or []
     snap = {
-        e["entity"]: {"key": e.get("key") or "", "key_type": None}
+        e["entity"]: {
+            "key": e.get("key") or "",
+            "key_type": _key_type_from_encoded(e.get("key") or ""),
+        }
         for e in entries
         if isinstance(e, dict) and e.get("entity")
     }
-    try:
-        dk = rados_obj.run_ceph_command(cmd="ceph auth dump-keys") or {}
-        for secret in (dk.get("data") or {}).get("secrets") or []:
-            ent = secret.get("entity") or {}
-            name = f"{ent.get('type_str') or ''}.{ent.get('id') or ''}"
-            if name in snap:
-                snap[name]["key_type"] = (
-                    (secret.get("auth") or {}).get("key") or {}
-                ).get("type_str")
-    except Exception as exc:
-        log.warning("ceph auth dump-keys unavailable; type asserts skipped: %s", exc)
     log.info("CephX key snapshot: %s entities", len(snap))
     return snap
 
 
 def _verify_cephx_auto_rotation(pre, post, upgraded_daemon_types=None):
-    """Compare pre/post snapshots.
+    """Compare pre/post auth-ls snapshots.
 
     FAIL: client.* value change; insecure service not rotated to aes256k.
     WARN: aes256k service value churn; key changed but post type unknown.
@@ -333,6 +343,7 @@ class CephXRotationRemediator:
             "duration_sec": 0,
             "errors": [],
             "io_continuity": {},
+            "cephfs_remount": {},
         }
         clients = clients or self.ceph_cluster.get_nodes(role="client")
         deployed_services = deployed_services or set()
@@ -385,6 +396,19 @@ class CephXRotationRemediator:
             self._rotate_stragglers()
             if not self._step_final_auth_verify():
                 return self._finish_failed(result, started)
+
+            # CephFS kernel/fuse need remount after client.admin / client.<id>
+            # keyring refresh. NFS does not (rotate-key / redeploy).
+            if io_mgr and clients and self._cephfs_remount_needed():
+                result["cephfs_remount"] = io_mgr.remount_cephfs_mounts(clients)
+                # Remount intentionally kills CephFS bg IO; drop those PIDs
+                # from continuity so we only require NFS/other + healthy mounts.
+                if bg_snapshot:
+                    bg_snapshot = {
+                        k: v
+                        for k, v in bg_snapshot.items()
+                        if v.get("service") != "cephfs"
+                    }
 
             if io_continuity:
                 io_result = io_mgr.wait_for_background_io_continuity(
@@ -446,6 +470,13 @@ class CephXRotationRemediator:
             raise TimeoutError(
                 f"CephX remediation exceeded timeout_sec={self.cfg['timeout_sec']}"
             )
+
+    def _cephfs_remount_needed(self):
+        """True when a keyring used by direct CephFS mounts was refreshed."""
+        return any(
+            e == "client.admin" or re.match(r"^client\.\d+$", e)
+            for e in self.entities_rotated
+        )
 
     def _health_checks(self):
         data = self._json_cmd("ceph health detail", timeout=60)
@@ -563,6 +594,55 @@ class CephXRotationRemediator:
         match = re.match(r"client\.nfs\.([^.\s]+)", entity)
         return match.group(1) if match else None
 
+    @staticmethod
+    def _parse_rotate_key_json(raw):
+        """Parse rotate-key JSON; tolerate cephadm banners on `_shell` output."""
+        text = (raw or "").strip()
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end < start:
+            raise ValueError(f"rotate-key failed (non-JSON): {text or 'empty output'}")
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"rotate-key failed (non-JSON): {text}") from exc
+
+    def _rotate_nfs_key(self, cluster_id, ceph_cli=None):
+        """Client first; Path A `_shell` if no client / local exec fails.
+
+        Returns (response_dict, ceph_cli_or_None). None disables further client attempts.
+        ValueError from client rotate_key = mgr/product — do not fall back.
+        """
+        key_type = self.cfg["key_type"]
+        if ceph_cli is not None:
+            try:
+                return (
+                    ceph_cli.nfs.cluster.rotate_key(cluster_id, key_type=key_type),
+                    ceph_cli,
+                )
+            except ValueError:
+                raise
+            except Exception as exc:
+                log.warning(
+                    "NFS rotate-key via client failed (%s); "
+                    "falling back to cephadm shell -- for remaining clusters",
+                    exc,
+                )
+
+        raw = self._shell(
+            [
+                "ceph",
+                "nfs",
+                "cluster",
+                "rotate-key",
+                cluster_id,
+                "--key-type",
+                key_type,
+                "--format",
+                "json",
+            ]
+        )
+        return self._parse_rotate_key_json(raw), None
+
     def _rotate_nfs_clusters(self, entities):
         by_cluster = {}
         for entity in entities:
@@ -571,6 +651,12 @@ class CephXRotationRemediator:
                 by_cluster.setdefault(cluster_id, set()).add(entity)
         if not by_cluster:
             return set()
+
+        clients = self.ceph_cluster.get_nodes(role="client")
+        ceph_cli = Ceph(clients[0]) if clients else None
+        if ceph_cli is None:
+            log.warning("No client node for NFS rotate-key; using cephadm shell --")
+
         handled = set()
         clusters = sorted(by_cluster)
         total = len(clusters)
@@ -582,9 +668,7 @@ class CephXRotationRemediator:
                 idx,
                 total,
             )
-            resp = self._adm.ceph.nfs.cluster.rotate_key(
-                cluster_id, key_type=self.cfg["key_type"]
-            )
+            resp, ceph_cli = self._rotate_nfs_key(cluster_id, ceph_cli=ceph_cli)
             if not resp.get("rotated"):
                 raise RuntimeError(
                     f"NFS rotate-key {cluster_id}: empty rotated list: {resp}"
