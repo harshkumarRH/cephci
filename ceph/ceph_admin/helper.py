@@ -302,7 +302,13 @@ class GenerateServiceSpec:
 
     def generate_osd_spec(self, spec):
         """
-        Return spec content for osd service
+        Return spec content for osd service.
+
+        Supports Squid+ nested DriveGroup specs (fields under `spec:`,
+        including `tpm2` for LUKS2 token enrollment), legacy Octopus flat
+        DriveGroups (device selections / options at the document root), and
+        hybrid suite forms (e.g. top-level `encrypted` with `data_devices`
+        under `spec:`).
 
         Args:
             spec (Dict): osd service spec config
@@ -312,53 +318,100 @@ class GenerateServiceSpec:
 
         Example::
 
+            # Legacy / Octopus flat layout
             spec:
               - service_type: osd
-                unmanaged: boolean    # true or false
-
+                service_id: example_osd_spec
                 placement:
-                  host_pattern: "*"   # either hosts or host_pattern
-                  nodes:
-                    - node2
-                    - node3
+                  host_pattern: "*"
                 data_devices:
-                    all: boolean      # true or false
-                encrypted: boolean    # true or false
+                  all: true
+                encrypted: true
 
+            # Hybrid suite layout (top-level encrypted + nested data_devices)
             spec:
               - service_type: osd
-                unmanaged: boolean    # true or false
+                service_id: osds
+                encrypted: true
                 placement:
-                  host_pattern: "*"   # either hosts or host_pattern
+                  label: osd
+                spec:
+                  data_devices:
+                    all: true
+
+            # Squid+ nested layout (tpm2 for LUKS2 token enrollment)
+            spec:
+              - service_type: osd
+                service_id: default_drive_group
+                unmanaged: false
+                crush_device_class: ssd
+                osds_per_device: 2
+                placement:
+                  host_pattern: "*"   # hosts, host_pattern, label, and/or count
                   nodes:
                     - node2
                     - node3
                 spec:
-                    data_devices:         # all - consider all device/LVs from node
-                        paths: all        # else whatever values provided from config.
-                    encrypted: boolean    # true or false
+                  data_devices:         # filters: all, model, vendor, size,
+                    paths: all          # rotational, limit, paths
+                  db_devices:
+                    rotational: 0
+                    limit: 2
+                  wal_devices:
+                    model: NVME-QQQQ-987
+                  journal_devices:
+                    paths: all
+                  encrypted: true
+                  tpm2: true            # Squid+ only
+                  filter_logic: AND
+                  db_slots: 5
+                  wal_slots: 5
+                  objectstore: bluestore
+                  block_db_size: 12G
+                  block_wal_size: 1G
+                  osds_per_device: 2
                 extra_container_args:
-                    - "--cpus=2"
+                  - "--cpus=2"
+                extra_entrypoint_args:
+                  - "--debug"
         """
         template = self._get_template("osd")
         node_names = spec["placement"].pop("nodes", None)
 
         if node_names:
             spec["placement"]["hosts"] = self.get_hostnames(node_names)
-        for item, values in spec["spec"].items():
-            if item in ["data_devices", "db_devices", "wal_devices"]:
-                if values.get("paths"):
-                    if values["paths"] == "all":
-                        devs = []
-                        for host in spec["placement"]["hosts"]:
-                            node = get_node_by_id(self.cluster, host)
-                            devs.extend(
-                                [
-                                    i if isinstance(i, str) else i.path
-                                    for i in node.volume_list
-                                ]
-                            )
-                        spec["spec"][item]["paths"] = [i for i in set(devs)]
+
+        device_keys = (
+            "data_devices",
+            "db_devices",
+            "wal_devices",
+            "journal_devices",
+        )
+
+        def _expand_paths_all(device_spec):
+            """Resolve `paths: all` to concrete device paths from placement hosts."""
+            if not isinstance(device_spec, dict):
+                return
+            if device_spec.get("paths") != "all":
+                return
+            hosts = spec.get("placement", {}).get("hosts", [])
+            devs = []
+            for host in hosts:
+                node = get_node_by_id(self.cluster, host)
+                devs.extend(
+                    [i if isinstance(i, str) else i.path for i in node.volume_list]
+                )
+            device_spec["paths"] = list(set(devs))
+
+        # Modern / hybrid: device selections under spec:
+        for item, values in spec.get("spec", {}).items():
+            if item in device_keys:
+                _expand_paths_all(values)
+
+        # Legacy Octopus flat layout: device selections at document root
+        for item in device_keys:
+            if item in spec:
+                _expand_paths_all(spec[item])
 
         return template.render(spec=spec)
 
